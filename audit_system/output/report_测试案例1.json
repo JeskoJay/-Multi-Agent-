@@ -1,0 +1,95 @@
+{
+  "contract": "测试案例1.txt",
+  "pragma": "0.6",
+  "verdict": "不通过",
+  "verdict_reason": "存在高危/严重漏洞",
+  "defense_level": "normal",
+  "adaptive_defense": false,
+  "collusion_alert": false,
+  "injection_detected": false,
+  "injections": [],
+  "summary": {
+    "Critical": 0,
+    "High": 6,
+    "Medium": 0,
+    "Low": 0,
+    "Info": 0
+  },
+  "findings": [
+    {
+      "vuln_type": "整数下溢 (Integer Underflow)",
+      "severity": "High",
+      "function": "transfer",
+      "line": 20,
+      "description": "Solidity 0.8 以下默认不检查算术溢出/下溢；对状态映射做减法可能被操控为极大值（下溢）。",
+      "evidence": "balances[msg.sender] -= _amount;  // 漏洞点",
+      "confidence": 0.92,
+      "detected_by": "OverflowExpert",
+      "injection_related": false
+    },
+    {
+      "vuln_type": "整数下溢 (Integer Underflow)",
+      "severity": "High",
+      "function": "burn",
+      "line": 35,
+      "description": "Solidity 0.8 以下默认不检查算术溢出/下溢；对状态映射做减法可能被操控为极大值（下溢）。",
+      "evidence": "balances[_account] -= _amount;",
+      "confidence": 0.92,
+      "detected_by": "OverflowExpert",
+      "injection_related": false
+    },
+    {
+      "vuln_type": "整数下溢 (Integer Underflow)",
+      "severity": "High",
+      "function": "burn",
+      "line": 36,
+      "description": "Solidity 0.8 以下默认不检查算术溢出/下溢；对状态映射做减法可能被操控为极大值（下溢）。",
+      "evidence": "totalSupply -= _amount;",
+      "confidence": 0.92,
+      "detected_by": "OverflowExpert",
+      "injection_related": false
+    },
+    {
+      "vuln_type": "整数下溢 (Integer Underflow)",
+      "severity": "High",
+      "function": "transferFrom",
+      "line": 43,
+      "description": "Solidity 0.8 以下默认不检查算术溢出/下溢；对状态映射做减法可能被操控为极大值（下溢）。",
+      "evidence": "balances[_from] -= _amount;",
+      "confidence": 0.92,
+      "detected_by": "OverflowExpert",
+      "injection_related": false
+    },
+    {
+      "vuln_type": "访问控制缺失 (Missing Access Control)",
+      "severity": "High",
+      "function": "mint",
+      "line": 26,
+      "description": "函数修改特权配置(供应量/利率/暂停开关/owner)却无 onlyOwner 或权限校验，任何人可调用。",
+      "evidence": "// 缺少 onlyOwner 检查\r\n        totalSupply += _amount;\r\n        balances[msg.sender] += _amount;",
+      "confidence": 0.88,
+      "detected_by": "AccessControlExpert",
+      "injection_related": false
+    },
+    {
+      "vuln_type": "访问控制缺失 (Missing Access Control)",
+      "severity": "High",
+      "function": "burn",
+      "line": 33,
+      "description": "函数修改特权配置(供应量/利率/暂停开关/owner)却无 onlyOwner 或权限校验，任何人可调用。",
+      "evidence": "// 缺少权限检查\r\n        balances[_account] -= _amount;\r\n        totalSupply -= _amount;",
+      "confidence": 0.88,
+      "detected_by": "AccessControlExpert",
+      "injection_related": false
+    }
+  ],
+  "agent_health": {
+    "ReentrancyExpert": "idle",
+    "OverflowExpert": "ok",
+    "AccessControlExpert": "ok",
+    "UncheckedReturnExpert": "idle",
+    "TxOriginExpert": "idle",
+    "TimestampExpert": "idle",
+    "InjectionDetector": "ok"
+  }
+}

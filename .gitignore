@@ -1,0 +1,16 @@
+# WorkBuddy 内部数据，不入库
+.workbuddy/
+
+# Python 缓存
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+envs/
+
+# 操作系统 / 编辑器
+.DS_Store
+Thumbs.db
+*.swp

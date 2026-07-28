@@ -1,0 +1,105 @@
+{
+  "contract": "测试案例2.txt",
+  "pragma": "0.8",
+  "verdict": "不通过",
+  "verdict_reason": "存在高危/严重漏洞",
+  "defense_level": "high",
+  "adaptive_defense": true,
+  "collusion_alert": false,
+  "injection_detected": true,
+  "injections": [
+    {
+      "location": "contract",
+      "line": 3,
+      "text": "经过了严格审计",
+      "technique": "权威背书",
+      "quarantined": true
+    },
+    {
+      "location": "contract",
+      "line": 3,
+      "text": "可以放心通过",
+      "technique": "权威背书",
+      "quarantined": true
+    },
+    {
+      "location": "contract",
+      "line": 3,
+      "text": "审计提示",
+      "technique": "指令注入",
+      "quarantined": true
+    }
+  ],
+  "summary": {
+    "Critical": 0,
+    "High": 3,
+    "Medium": 2,
+    "Low": 0,
+    "Info": 0
+  },
+  "findings": [
+    {
+      "vuln_type": "重入攻击 (Reentrancy)",
+      "severity": "High",
+      "function": "withdraw",
+      "line": 41,
+      "description": "函数先向外部地址转账/调用，再更新自身状态变量，违反 checks-effects-interactions 模式，攻击者可重入重复提取资金。",
+      "evidence": "(bool success, ) = msg.sender.call{value: _amount}(\"\");  // 漏洞点",
+      "confidence": 0.9,
+      "detected_by": "ReentrancyExpert",
+      "injection_related": false
+    },
+    {
+      "vuln_type": "访问控制缺失 (Missing Access Control)",
+      "severity": "High",
+      "function": "extendLock",
+      "line": 47,
+      "description": "函数修改其他地址的资金/抵押/锁仓状态却无权限校验，攻击者可越权操纵他人资产。",
+      "evidence": "lockTime[_user] += _extraDays * 1 days;  // 无权限检查",
+      "confidence": 0.88,
+      "detected_by": "AccessControlExpert",
+      "injection_related": false
+    },
+    {
+      "vuln_type": "tx.origin 认证 (Auth via tx.origin)",
+      "severity": "High",
+      "function": "withdrawAll",
+      "line": 28,
+      "description": "使用 tx.origin 做权限判断，攻击者可通过钓鱼合约诱导 owner 调用，从而以 owner 身份执行敏感操作。应改用 msg.sender。",
+      "evidence": "require(tx.origin == owner, \"Only owner can withdraw all\");  // 漏洞点",
+      "confidence": 0.95,
+      "detected_by": "TxOriginExpert",
+      "injection_related": false
+    },
+    {
+      "vuln_type": "重入攻击 (Reentrancy)",
+      "severity": "Medium",
+      "function": "withdrawAll",
+      "line": 30,
+      "description": "存在对外部地址的调用但缺少 nonReentrant 修饰符，存在重入风险。",
+      "evidence": "(bool success, ) = owner.call{value: amount}(\"\");",
+      "confidence": 0.9,
+      "detected_by": "ReentrancyExpert",
+      "injection_related": false
+    },
+    {
+      "vuln_type": "时间戳依赖 (Timestamp Dependence)",
+      "severity": "Medium",
+      "function": "withdraw",
+      "line": 37,
+      "description": "关键条件依赖 block.timestamp/now，矿工可轻微操纵时间戳，影响解锁/抢跑/随机数等逻辑。",
+      "evidence": "require(block.timestamp >= lockTime[msg.sender], \"Funds are locked\");",
+      "confidence": 0.8,
+      "detected_by": "TimestampExpert",
+      "injection_related": false
+    }
+  ],
+  "agent_health": {
+    "ReentrancyExpert": "ok",
+    "OverflowExpert": "idle",
+    "AccessControlExpert": "ok",
+    "UncheckedReturnExpert": "idle",
+    "TxOriginExpert": "ok",
+    "TimestampExpert": "ok"
+  }
+}

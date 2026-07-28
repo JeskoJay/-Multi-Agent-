@@ -1,0 +1,48 @@
+// 攻击方式：攻击者利用整数下溢，从零余额账户转出大量代币；或直接调用mint()/burn()操纵供应量。
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.6.0;  // 使用0.8以下版本，默认无溢出检查
+
+contract VulnerableToken {
+    mapping(address => uint256) public balances;
+    mapping(address => mapping(address => uint256)) public allowance;
+    uint256 public totalSupply;
+    address public owner;
+
+    constructor(uint256 _initialSupply) public {
+        totalSupply = _initialSupply;
+        balances[msg.sender] = _initialSupply;
+        owner = msg.sender;
+    }
+
+    // 漏洞1: 整数溢出（Solidity 0.8以下无自动检查）
+    function transfer(address _to, uint256 _amount) public returns (bool) {
+        // 如果balances[msg.sender] < _amount，会下溢为2^256-1
+        balances[msg.sender] -= _amount;  // 漏洞点
+        balances[_to] += _amount;
+        return true;
+    }
+
+    // 漏洞2: 访问控制缺失 — 任何人都可以铸造新代币
+    function mint(uint256 _amount) public {
+        // 缺少 onlyOwner 检查
+        totalSupply += _amount;
+        balances[msg.sender] += _amount;
+    }
+
+    // 漏洞3: 访问控制缺失 — 任何人都可以销毁任意地址的代币
+    function burn(address _account, uint256 _amount) public {
+        // 缺少权限检查
+        balances[_account] -= _amount;
+        totalSupply -= _amount;
+    }
+
+    // 漏洞4: 未检查返回值的外部调用
+    function transferFrom(address _from, address _to, uint256 _amount) public returns (bool) {
+        require(_amount <= balances[_from], "Insufficient balance");
+        require(_amount <= allowance[_from][msg.sender], "Allowance exceeded");
+        balances[_from] -= _amount;
+        balances[_to] += _amount;
+        allowance[_from][msg.sender] -= _amount;
+        return true;
+    }
+}

@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>智安科技 · 智能合约安全审计 Multi-Agent 系统</title>
+<style>
+  :root {
+    --bg: #0d1117; --bg2: #161b22; --bg3: #1c2230; --bg4: #222b3a;
+    --border: #2d3648; --text: #e6edf3; --muted: #8b98a9;
+    --blue: #58a6ff; --green: #3fb950; --red: #f85149; --yellow: #d29922;
+    --purple: #bc8cff; --cyan: #39d0d8; --orange: #ff9f40;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    font-size: 13px; line-height: 1.5;
+  }
+  header {
+    display: flex; align-items: center; gap: 14px;
+    padding: 12px 20px; background: linear-gradient(90deg, #11161f, #182234);
+    border-bottom: 1px solid var(--border);
+  }
+  header .logo {
+    width: 34px; height: 34px; border-radius: 9px; flex: none;
+    background: linear-gradient(135deg, var(--blue), var(--purple));
+    display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 18px;
+  }
+  header h1 { font-size: 16px; margin: 0; font-weight: 650; }
+  header .sub { color: var(--muted); font-size: 12px; }
+  header .health { margin-left: auto; display: flex; align-items: center; gap: 6px; color: var(--green); font-size: 12px; }
+  header .health .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); }
+
+  .toolbar {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 10px 20px; background: var(--bg2); border-bottom: 1px solid var(--border);
+  }
+  .toolbar select, .toolbar button {
+    background: var(--bg3); color: var(--text); border: 1px solid var(--border);
+    border-radius: 7px; padding: 7px 12px; font-size: 13px; cursor: pointer;
+  }
+  .toolbar button.primary { background: linear-gradient(135deg, var(--blue), #3b82f6); border: none; font-weight: 600; }
+  .toolbar button.primary:hover { filter: brightness(1.1); }
+  .toolbar button:disabled { opacity: .5; cursor: not-allowed; }
+  .toolbar .spacer { flex: 1; }
+  .toolbar .status { color: var(--muted); font-size: 12px; }
+  .toolbar .status.run { color: var(--cyan); }
+
+  .main { display: grid; grid-template-columns: 1fr 1.05fr; gap: 1px; height: calc(100vh - 110px); background: var(--border); }
+  .pane { background: var(--bg); display: flex; flex-direction: column; min-height: 0; }
+  .pane > .sub {
+    padding: 8px 14px; background: var(--bg2); border-bottom: 1px solid var(--border);
+    font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 8px; font-weight: 600;
+  }
+  .pane > .sub .badge { margin-left: auto; background: var(--bg3); padding: 2px 8px; border-radius: 10px; font-weight: 500; }
+
+  textarea#src {
+    flex: none; height: 230px; resize: vertical; border: none; outline: none;
+    background: #0a0e14; color: #c9d4e2; padding: 12px 14px; font-family: "JetBrains Mono", Consolas, monospace;
+    font-size: 12.5px; line-height: 1.55; border-bottom: 1px solid var(--border);
+  }
+
+  /* 代码视图 */
+  #codeView { flex: 1; overflow: auto; background: #0a0e14; padding: 6px 0; }
+  .code-line { display: flex; align-items: flex-start; padding: 0 12px; border-left: 3px solid transparent; }
+  .code-line:hover { background: rgba(255,255,255,.03); }
+  .code-line.flag { border-left-color: var(--red); background: rgba(248,81,73,.07); }
+  .code-line.flag-warn { border-left-color: var(--yellow); background: rgba(210,153,34,.07); }
+  .code-line.flash { animation: flash 1.1s ease; }
+  @keyframes flash { 0% { background: rgba(88,166,255,.35);} 100% { background: rgba(248,81,73,.07);} }
+  .code-line .ln { width: 38px; flex: none; text-align: right; padding-right: 12px; color: #4a5568; user-select: none; -webkit-user-select: none; }
+  .code-line .lc { font-family: "JetBrains Mono", Consolas, monospace; font-size: 12.5px; white-space: pre; color: #c9d4e2; }
+  .code-line .mk { width: 14px; flex: none; text-align: center; }
+  .code-line .mk.red::before { content: "●"; color: var(--red); font-size: 10px; }
+  .code-line .mk.yel::before { content: "●"; color: var(--yellow); font-size: 10px; }
+  /* Solidity 高亮 */
+  .kw { color: #ff7b72; } .cmt { color: #6b7785; font-style: italic; }
+  .str { color: #a5d6ff; } .num { color: #79c0ff; }
+
+  /* 右侧 tabs */
+  .tabs { display: flex; gap: 2px; padding: 0 12px; background: var(--bg2); border-bottom: 1px solid var(--border); }
+  .tabs .tab { padding: 9px 14px; cursor: pointer; color: var(--muted); border-bottom: 2px solid transparent; }
+  .tabs .tab.active { color: var(--text); border-bottom-color: var(--blue); }
+  .panel { flex: 1; overflow: auto; padding: 16px; display: none; }
+  .panel.active { display: block; }
+
+  /* 审计报告 */
+  .verdict { display: flex; align-items: center; gap: 14px; padding: 16px; border-radius: 12px; margin-bottom: 16px; }
+  .verdict.fail { background: rgba(248,81,73,.12); border: 1px solid rgba(248,81,73,.4); }
+  .verdict.pass { background: rgba(63,185,80,.12); border: 1px solid rgba(63,185,80,.4); }
+  .verdict.manual { background: rgba(210,153,34,.12); border: 1px solid rgba(210,153,34,.4); }
+  .verdict .big { font-size: 22px; font-weight: 700; }
+  .verdict.fail .big { color: var(--red); } .verdict.pass .big { color: var(--green); } .verdict.manual .big { color: var(--yellow); }
+  .verdict .reason { color: var(--muted); font-size: 12px; }
+
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+  .chip { padding: 6px 12px; border-radius: 20px; background: var(--bg3); font-size: 12px; border: 1px solid var(--border); }
+  .chip b { font-size: 14px; }
+
+  table.findings { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  table.findings th, table.findings td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  table.findings th { color: var(--muted); font-weight: 600; position: sticky; top: 0; background: var(--bg); }
+  table.findings tr { cursor: pointer; }
+  table.findings tr:hover { background: rgba(255,255,255,.03); }
+  .sev { padding: 2px 8px; border-radius: 6px; font-weight: 600; font-size: 11px; white-space: nowrap; }
+  .sev.Critical { background: rgba(248,81,73,.2); color: var(--red); }
+  .sev.High { background: rgba(255,111,55,.2); color: var(--orange); }
+  .sev.Medium { background: rgba(210,153,34,.2); color: var(--yellow); }
+  .sev.Low { background: rgba(88,166,255,.2); color: var(--blue); }
+  .sev.Info { background: rgba(139,152,169,.2); color: var(--muted); }
+  .fn { color: var(--purple); font-family: monospace; }
+  .ev { color: var(--muted); font-family: monospace; font-size: 11px; }
+
+  /* Agent 流程 */
+  .flow { display: flex; flex-direction: column; gap: 10px; }
+  .stage { }
+  .stage-title { font-size: 11px; color: var(--muted); margin: 6px 0 4px; letter-spacing: .5px; text-transform: uppercase; }
+  .stage-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .agent {
+    flex: 1 1 180px; min-width: 160px; padding: 10px 12px; border-radius: 10px;
+    background: var(--bg3); border: 1px solid var(--border); position: relative; transition: all .3s;
+  }
+  .agent .nm { font-weight: 600; font-size: 12.5px; display: flex; align-items: center; gap: 7px; }
+  .agent .st-dot { width: 9px; height: 9px; border-radius: 50%; background: #4a5568; flex: none; }
+  .agent .role { color: var(--muted); font-size: 11px; margin-top: 4px; min-height: 28px; }
+  .agent .prod { font-size: 11px; margin-top: 6px; color: var(--cyan); }
+  .agent.pending { opacity: .5; }
+  .agent.running { border-color: var(--blue); box-shadow: 0 0 0 1px var(--blue), 0 0 14px rgba(88,166,255,.25); }
+  .agent.running .st-dot { background: var(--blue); animation: pulse 1s infinite; }
+  .agent.done { opacity: 1; }
+  .agent.done .st-dot { background: var(--green); }
+  .agent.compromised, .agent.suspicious { border-color: var(--red); }
+  .agent.compromised .st-dot, .agent.suspicious .st-dot { background: var(--red); }
+  .agent.idle { opacity: .65; }
+  .agent.idle .st-dot { background: var(--muted); }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+
+  /* 事件流 */
+  #timeline { font-family: monospace; font-size: 11.5px; }
+  .evt { padding: 3px 6px; border-radius: 5px; margin-bottom: 2px; display: flex; gap: 8px; animation: slidein .3s ease; }
+  .evt .t { color: var(--muted); width: 56px; flex: none; }
+  .evt .a { color: var(--blue); width: 150px; flex: none; }
+  .evt .d { color: var(--text); }
+  @keyframes slidein { from { opacity: 0; transform: translateX(-6px);} to { opacity: 1; transform: none; } }
+
+  /* 提示注入 */
+  .inj-banner { padding: 14px 16px; border-radius: 12px; margin-bottom: 14px; display: flex; align-items: center; gap: 12px; }
+  .inj-banner.hit { background: rgba(248,81,73,.12); border: 1px solid rgba(248,81,73,.4); }
+  .inj-banner.safe { background: rgba(63,185,80,.1); border: 1px solid rgba(63,185,80,.35); }
+  .inj-banner .ic { font-size: 22px; }
+  .inj-banner .tt { font-weight: 600; font-size: 14px; }
+  .inj-banner .tt.fail { color: var(--red); } .inj-banner .tt.pass { color: var(--green); }
+  .inj-card { border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-bottom: 10px; background: var(--bg3); }
+  .inj-card .line { color: var(--muted); font-size: 11px; }
+  .inj-card .tech { display: inline-block; background: rgba(188,140,255,.18); color: var(--purple); padding: 1px 8px; border-radius: 6px; font-size: 11px; margin: 4px 0; }
+  .inj-card .txt { font-family: monospace; background: #0a0e14; padding: 6px 9px; border-radius: 6px; margin-top: 6px; border: 1px solid var(--border); color: #ffd479; }
+  .inj-card .tag { float: right; color: var(--green); font-size: 11px; }
+
+  .empty { color: var(--muted); text-align: center; padding: 40px 0; }
+  .hint { color: var(--muted); font-size: 11px; margin-top: 6px; }
+  a.link { color: var(--blue); }
+  #llmPanel { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 12px; background: var(--bg2); border-bottom: 1px solid var(--border); }
+  #llmPanel input { background: #0a0e14; color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 6px 9px; font-size: 12px; }
+  #llmPanel #llmKey { width: 230px; } #llmPanel #llmBase, #llmPanel #llmModel { width: 175px; }
+  #llmPanel label { display: flex; align-items: center; gap: 5px; font-size: 12px; cursor: pointer; }
+  #llmPanel .hint { color: var(--muted); font-size: 11px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">智</div>
+  <div>
+    <h1>智能合约安全审计 · Multi-Agent 系统</h1>
+    <div class="sub">Supervisor + 并行漏洞专家 + 共识验证 + 安全监控 · 含提示注入防御</div>
+  </div>
+  <div class="health"><span class="dot"></span><span id="healthText">引擎在线</span></div>
+</header>
+
+<div class="toolbar">
+  <select id="caseSel">
+    <option value="">📂 加载测试案例…</option>
+  </select>
+  <button id="loadBtn">载入</button>
+  <button id="clearBtn">清空</button>
+  <div class="spacer"></div>
+  <span class="status" id="status">就绪</span>
+  <button class="primary" id="runBtn">▶ 开始审计</button>
+</div>
+
+<div class="main">
+  <!-- 左：源码 -->
+  <section class="pane">
+    <div class="sub">合约源码（编辑 / 粘贴 Solidity）</div>
+    <div id="llmPanel">
+      <label><input type="checkbox" id="llmOn" /> 🤖 启用 LLM 会诊</label>
+      <input id="llmKey" type="text" placeholder="API Key（sk-... / 平台密钥）" />
+      <input id="llmBase" type="text" placeholder="Base URL（可选，默认 OpenAI）" />
+      <input id="llmModel" type="text" placeholder="Model（可选，默认 gpt-4o-mini）" />
+      <span class="hint">开启后专家/注入检测走大模型（双轨）；需自备兼容 OpenAI 的密钥</span>
+    </div>
+    <textarea id="src" placeholder="在此粘贴合约源码，或点击右上「加载测试案例」…"></textarea>
+    <div class="sub">审计视图（语法高亮 · 点击漏洞可定位） <span class="badge" id="codeBadge">—</span></div>
+    <div id="codeView"><div class="empty">运行审计后，这里将显示带行号与漏洞标记的高亮代码。</div></div>
+  </section>
+
+  <!-- 右：结果 -->
+  <section class="pane">
+    <div class="sub">审计结果</div>
+    <div class="tabs">
+      <div class="tab active" data-tab="report">📋 审计报告</div>
+      <div class="tab" data-tab="flow">🕸 多 Agent 流程</div>
+      <div class="tab" data-tab="inj">🛡 提示注入</div>
+      <div class="tab" data-tab="log">📜 事件流</div>
+    </div>
+
+    <div class="panel active" id="panel-report">
+      <div class="empty">尚未审计。粘贴合约后点击「开始审计」。</div>
+    </div>
+
+    <div class="panel" id="panel-flow">
+      <div class="empty">运行审计后，这里将实时展示各 Agent 的协作过程。</div>
+    </div>
+
+    <div class="panel" id="panel-inj">
+      <div class="empty">运行审计后，这里展示提示注入检测与拦截情况。</div>
+    </div>
+
+    <div class="panel" id="panel-log">
+      <div id="timeline"><div class="empty">运行审计后，这里滚动展示 Agent 间消息与动作轨迹。</div></div>
+    </div>
+  </section>
+</div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => document.querySelectorAll(s);
+
+let currentFile = "contract.sol";
+const SEV_RANK = { Critical: 4, High: 3, Medium: 2, Low: 1, Info: 0 };
+
+// ---------- tabs ----------
+$$(".tabs .tab").forEach(t => t.onclick = () => {
+  $$(".tabs .tab").forEach(x => x.classList.remove("active"));
+  $$(".panel").forEach(x => x.classList.remove("active"));
+  t.classList.add("active");
+  $("#panel-" + t.dataset.tab).classList.add("active");
+});
+
+// ---------- 健康 + 案例 ----------
+async function init() {
+  try {
+    const h = await fetch("/api/health"); const j = await h.json();
+    $("#healthText").textContent = j.status === "ok" ? "引擎在线" : "引擎异常";
+  } catch { $("#healthText").textContent = "无法连接后端"; }
+  try {
+    const c = await fetch("/api/cases"); const j = await c.json();
+    const sel = $("#caseSel");
+    (j.cases || []).forEach(cs => {
+      const o = document.createElement("option");
+      o.value = cs.name; o.textContent = cs.name; o.dataset.src = cs.source; o.dataset.fn = cs.file_name;
+      sel.appendChild(o);
+    });
+  } catch {}
+}
+$("#loadBtn").onclick = () => {
+  const o = $("#caseSel").selectedOptions[0];
+  if (!o || !o.value) return;
+  $("#src").value = o.dataset.src;
+  currentFile = o.dataset.fn || (o.value + ".sol");
+  setStatus("已载入：" + o.value, false);
+};
+$("#clearBtn").onclick = () => { $("#src").value = ""; currentFile = "contract.sol"; };
+
+function setStatus(t, run) {
+  const e = $("#status"); e.textContent = t; e.classList.toggle("run", !!run);
+}
+
+// ---------- 高亮 ----------
+function esc(s) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+const TOKEN = /(\/\/[^\n]*|\/\*[\s\S]*?\*\/)|("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')|(\b\d[\d_.]*\b)|\b(pragma|contract|interface|library|function|modifier|public|private|internal|external|view|pure|payable|returns|return|mapping|address|uint\d*|int\d*|bool|string|bytes\d*|memory|storage|calldata|constructor|event|emit|struct|enum|if|else|for|while|require|assert|revert|msg|block|tx|this|new|using|import|solidity|constant|immutable|virtual|override|function|mapping|assembly|delegatecall|call|send|transfer)\b)/g;
+function highlight(line) {
+  let out = "", last = 0, m;
+  TOKEN.lastIndex = 0;
+  while ((m = TOKEN.exec(line))) {
+    out += esc(line.slice(last, m.index));
+    let cls = m[1] ? "cmt" : m[2] ? "str" : m[3] ? "num" : "kw";
+    out += `<span class="${cls}">${esc(m[0])}</span>`;
+    last = m.index + m[0].length;
+  }
+  out += esc(line.slice(last));
+  return out;
+}
+
+// ---------- 渲染代码视图 ----------
+function renderCode(source, findings) {
+  const lines = source.split("\n");
+  const flagMap = {};
+  findings.forEach(f => {
+    if (f.line > 0 && f.line <= lines.length) {
+      const k = f.line;
+      if (!flagMap[k]) flagMap[k] = { sev: f.severity };
+      else if (SEV_RANK[f.severity] > SEV_RANK[flagMap[k].sev]) flagMap[k].sev = f.severity;
+    }
+  });
+  let html = "";
+  lines.forEach((ln, i) => {
+    const n = i + 1;
+    const f = flagMap[n];
+    let cls = "code-line", mk = "";
+    if (f) { cls += f.sev === "Critical" || f.sev === "High" ? " flag" : " flag-warn"; mk = `<span class="mk ${f.sev === "Critical" || f.sev === "High" ? "red" : "yel"}"></span>`; }
+    else mk = `<span class="mk"></span>`;
+    html += `<div class="${cls}" data-line="${n}"><span class="ln">${n}</span><span class="lc">${highlight(ln) || " "}</span>${mk}</div>`;
+  });
+  $("#codeView").innerHTML = html;
+  $("#codeBadge").textContent = lines.length + " 行 · " + findings.length + " 处标记";
+  $$("#codeView .code-line").forEach(d => d.onclick = () => {
+    $$("#codeView .code-line").forEach(x => x.classList.remove("flash"));
+    d.classList.add("flash");
+  });
+}
+
+function locate(line) {
+  const el = $(`#codeView .code-line[data-line="${line}"]`);
+  if (el) { el.scrollIntoView({ block: "center", behavior: "smooth" });
+    $$("#codeView .code-line").forEach(x => x.classList.remove("flash"));
+    el.classList.add("flash"); }
+}
+
+// ---------- 渲染报告 ----------
+function renderReport(r) {
+  const v = r.verdict;
+  const vcls = v === "通过" ? "pass" : v === "需人工复核" ? "manual" : "fail";
+  const s = r.summary;
+  const chips = [["Critical", s.Critical, "var(--red)"], ["High", s.High, "var(--orange)"],
+    ["Medium", s.Medium, "var(--yellow)"], ["Low", s.Low, "var(--blue)"], ["Info", s.Info, "var(--muted)"]]
+    .map(([k, c]) => `<span class="chip"><b style="color:${k==='Critical'?'var(--red)':k==='High'?'var(--orange)':k==='Medium'?'var(--yellow)':k==='Low'?'var(--blue)':'var(--muted)'}">${c}</b> ${k}</span>`).join("");
+  const rows = r.findings.slice().sort((a, b) => SEV_RANK[b.severity] - SEV_RANK[a.severity]).map(f => `
+    <tr data-line="${f.line}">
+      <td><b>${f.line}</b></td>
+      <td><span class="sev ${f.severity}">${f.severity}</span></td>
+      <td>${f.vuln_type}${f.injection_related ? ' <span style="color:var(--purple)">⚠注入相关</span>' : ''}</td>
+      <td class="fn">${f.function || "—"}</td>
+      <td>${f.confidence}</td>
+      <td>${esc(f.description)}<div class="ev">${esc(f.evidence)}</div></td>
+    </tr>`).join("");
+  const def = r.adaptive_defense ? "已启用（检测到可疑诱导后提升防御等级）" : "未启用";
+  $("#panel-report").innerHTML = `
+    <div class="verdict ${vcls}">
+      <div class="big">${v === "通过" ? "✅" : v === "需人工复核" ? "⚠️" : "❌"} ${v}</div>
+      <div><div class="reason">${esc(r.verdict_reason)}</div>
+      <div class="reason">防御等级：${r.defense_level} ｜ 自适应防御：${def} ｜ 共谋检测：${r.collusion_alert ? "⚠️ 发现风险" : "✅ 正常"} ｜ pragma：${esc(r.pragma)}</div></div>
+    </div>
+    <div class="chips">${chips}</div>
+    <table class="findings">
+      <thead><tr><th>行</th><th>严重度</th><th>类型</th><th>函数</th><th>置信</th><th>说明 / 证据</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="6" style="color:var(--muted)">未发现已知漏洞模式。</td></tr>'}</tbody>
+    </table>`;
+  $$("#panel-report tr[data-line]").forEach(tr => tr.onclick = () => {
+    $$(".tabs .tab").forEach(x => x.classList.remove("active"));
+    $$(".panel").forEach(x => x.classList.remove("active"));
+    $('.tabs .tab[data-tab="report"]').classList.add("active");
+    $("#panel-report").classList.add("active");
+    locate(parseInt(tr.dataset.line, 10));
+  });
+}
+
+// ---------- 渲染提示注入 ----------
+function renderInjection(r) {
+  const inj = r.injections || [];
+  const hit = inj.length > 0;
+  const banner = hit
+    ? `<div class="inj-banner hit"><div class="ic">🛡</div><div><div class="tt fail">已拦截 ${inj.length} 处提示注入攻击</div>
+       <div class="reason">合约中诱导性文本已被隔离，专家 Agent 仅基于代码事实审计，未受操纵。</div></div></div>`
+    : `<div class="inj-banner safe"><div class="ic">✅</div><div><div class="tt pass">未检测到提示注入攻击</div>
+       <div class="reason">合约文本中未发现诱导性指令。</div></div></div>`;
+  const cards = inj.map(i => `
+    <div class="inj-card">
+      <span class="tag">${i.quarantined ? "✅ 已隔离" : "⚠ 未隔离"}</span>
+      <div class="line">第 ${i.line} 行 · 位置：${esc(i.location)}</div>
+      <span class="tech">${esc(i.technique)}</span>
+      <div class="txt">${esc(i.text)}</div>
+    </div>`).join("");
+  $("#panel-inj").innerHTML = banner + (cards || '<div class="empty">无记录。</div>');
+}
+
+// ---------- 渲染 Agent 流程 + 动画 ----------
+let flowTimers = [];
+function renderFlow(r) {
+  flowTimers.forEach(t => clearTimeout(t)); flowTimers = [];
+  const agents = r.agents;
+  const stages = {};
+  agents.forEach(a => { (stages[a.stage] = stages[a.stage] || []).push(a); });
+  const titles = { 1: "阶段 1 · 入口解析", 2: "阶段 2 · 提示注入检测（先于漏洞专家）",
+    3: "阶段 3 · 漏洞专家并行分析", 4: "阶段 4 · 共识验证 + 安全监控", 5: "阶段 5 · 报告生成" };
+  let html = '<div class="flow">';
+  Object.keys(stages).sort().forEach(st => {
+    html += `<div class="stage"><div class="stage-title">${titles[st] || ("阶段 " + st)}</div><div class="stage-row">`;
+    stages[st].forEach(a => {
+      html += `<div class="agent pending" id="ag-${a.id}">
+        <div class="nm"><span class="st-dot"></span>${a.name}</div>
+        <div class="role">${a.role}</div>
+        <div class="prod" id="agp-${a.id}"></div></div>`;
+    });
+    html += `</div></div>`;
+  });
+  html += '</div>';
+  $("#panel-flow").innerHTML = html;
+
+  // 动画：按 stage 顺序激活，并行 stage 内同时 running
+  const stageKeys = Object.keys(stages).sort();
+  let delay = 300;
+  stageKeys.forEach(st => {
+    const group = stages[st];
+    flowTimers.push(setTimeout(() => {
+      group.forEach(a => {
+        const el = $("#ag-" + a.id);
+        el.classList.remove("pending"); el.classList.add("running");
+      });
+    }, delay));
+    flowTimers.push(setTimeout(() => {
+      group.forEach(a => {
+        const el = $("#ag-" + a.id);
+        el.classList.remove("running");
+        el.classList.add(a.status);
+        const pe = $("#agp-" + a.id);
+        if (a.id === "InjectionDetector") pe.textContent = a.produced > 0 ? ("🛡 拦截 " + a.produced + " 处") : "无注入";
+        else if (a.produced > 0) pe.textContent = "🔍 发现 " + a.produced + " 处";
+        else if (a.status === "compromised" || a.status === "suspicious") pe.textContent = "⚠ 状态异常";
+        else pe.textContent = "✓ 完成";
+      });
+    }, delay + 650));
+    delay += 950;
+  });
+}
+
+// ---------- 事件流 ----------
+let logTimers = [];
+function renderTimeline(r) {
+  logTimers.forEach(t => clearTimeout(t)); logTimers = [];
+  $("#timeline").innerHTML = "";
+  const evs = r.timeline;
+  evs.forEach((e, i) => {
+    logTimers.push(setTimeout(() => {
+      const div = document.createElement("div");
+      div.className = "evt";
+      div.innerHTML = `<span class="t">${e.t.toFixed(2)}s</span><span class="a">${esc(e.agent)}</span><span class="d">${esc(e.action)} ${esc(e.detail)}</span>`;
+      $("#timeline").appendChild(div);
+      $("#timeline").scrollTop = $("#timeline").scrollHeight;
+    }, 60 * i));
+  });
+}
+
+// ---------- 主流程 ----------
+  $("#runBtn").onclick = async () => {
+    const src = $("#src").value;
+    if (!src.trim()) { setStatus("请先粘贴合约源码", false); return; }
+    const body = { source: src, file_name: currentFile };
+    if ($("#llmOn").checked) {
+      const key = $("#llmKey").value.trim();
+      if (!key) { setStatus("启用 LLM 需填写 API Key", false); return; }
+      body.llm = {
+        api_key: key,
+        base_url: $("#llmBase").value.trim() || undefined,
+        model: $("#llmModel").value.trim() || undefined,
+      };
+      setStatus("LLM 会诊模式：专家正在调用大模型…", true);
+    }
+  $("#runBtn").disabled = true;
+  setStatus("审计中… 各 Agent 正在协作分析", true);
+  // 重置视图
+  $("#panel-report").innerHTML = '<div class="empty">分析进行中…</div>';
+  $("#panel-flow").innerHTML = '<div class="empty">启动 Agent 协作…</div>';
+  $("#panel-inj").innerHTML = '<div class="empty">检测提示注入…</div>';
+  $("#timeline").innerHTML = "";
+  try {
+    const resp = await fetch("/api/audit", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ source: src, file_name: currentFile })
+    });
+    const r = await resp.json();
+    if (r.error) { setStatus("错误：" + r.error, false); $("#panel-report").innerHTML = '<div class="empty" style="color:var(--red)">' + esc(r.error) + '</div>'; return; }
+    renderCode(r.source, r.findings);
+    renderReport(r);
+    renderInjection(r);
+    renderFlow(r);
+    renderTimeline(r);
+    // 自动切到流程页展示协作
+    $$(".tabs .tab").forEach(x => x.classList.remove("active"));
+    $$(".panel").forEach(x => x.classList.remove("active"));
+    $('.tabs .tab[data-tab="flow"]').classList.add("active");
+    $("#panel-flow").classList.add("active");
+    setStatus("完成 · 结论：" + r.verdict + " · 漏洞 " + (r.summary.Critical + r.summary.High + r.summary.Medium + r.summary.Low + r.summary.Info) + " · 注入 " + r.injections.length, false);
+  } catch (e) {
+    setStatus("请求失败：" + e.message, false);
+  } finally {
+    $("#runBtn").disabled = false;
+  }
+};
+
+init();
+</script>
+</body>
+</html>
